@@ -22,13 +22,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _senhaController = TextEditingController();
   final TextEditingController _telefoneController = TextEditingController();
-  final TextEditingController _idadeController = TextEditingController();
-  final TextEditingController _adminCodeController = TextEditingController();
-
-  int _tipoPerfil = 1;
+  DateTime? _dataNascimento;
+  final int _tipoPerfil = 1;
   String? _sexo;
   XFile? _imageFile;
   bool _isLoading = false;
+
+  bool _validarCPF(String cpf) {
+    // Remove caracteres não numéricos
+    cpf = cpf.replaceAll(RegExp(r'\D'), '');
+
+    if (cpf.length != 11) return false;
+
+    // Rejeita sequências com todos dígitos iguais (ex: 111.111.111-11)
+    if (RegExp(r'^(\d)\1{10}$').hasMatch(cpf)) return false;
+
+    // Calcula o 1º dígito verificador
+    int soma = 0;
+    for (int i = 0; i < 9; i++) {
+      soma += int.parse(cpf[i]) * (10 - i);
+    }
+    int digito1 = (soma * 10) % 11;
+    if (digito1 == 10 || digito1 == 11) digito1 = 0;
+    if (digito1 != int.parse(cpf[9])) return false;
+
+    // Calcula o 2º dígito verificador
+    soma = 0;
+    for (int i = 0; i < 10; i++) {
+      soma += int.parse(cpf[i]) * (11 - i);
+    }
+    int digito2 = (soma * 10) % 11;
+    if (digito2 == 10 || digito2 == 11) digito2 = 0;
+    if (digito2 != int.parse(cpf[10])) return false;
+
+    return true;
+  }
+
+  int? _calcularIdade(DateTime? data) {
+    if (data == null) return null;
+    final hoje = DateTime.now();
+    int idade = hoje.year - data.year;
+    if (hoje.month < data.month ||
+        (hoje.month == data.month && hoje.day < data.day)) {
+      idade--;
+    }
+    return idade;
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF2E7D32),
+            onPrimary: Colors.white,
+            surface: Color(0xFF1B5E20),
+            onSurface: Colors.white,
+            secondary: Color(0xFF2E7D32),
+            onSecondary: Colors.white,
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF66BB6A),
+            ),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _dataNascimento = picked);
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     PermissionStatus status;
@@ -92,10 +159,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_cpfController.text.isEmpty || _cpfController.text.length < 11) {
+    if (!_validarCPF(_cpfController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Informe um CPF válido (apenas números)."),
+          backgroundColor: Color.fromARGB(255, 255, 53, 53),
+          content: Text("CPF inválido. Verifique os números informados."),
         ),
       );
       return;
@@ -109,9 +177,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       senha: _senhaController.text,
       tipoPerfil: _tipoPerfil,
       telefone: _telefoneController.text,
-      idade: int.tryParse(_idadeController.text),
+      idade: _calcularIdade(_dataNascimento),
       sexo: _sexo,
-      adminCode: _adminCodeController.text,
+      adminCode: '',
       fotoPerfil: _imageFile,
     );
 
@@ -306,7 +374,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Row(
                         children: [
                           Expanded(
-                            flex: 2,
+                            flex: 1,
                             child: _buildTextField(
                               controller: _telefoneController,
                               label: 'Telefone',
@@ -317,12 +385,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             flex: 1,
-                            child: _buildTextField(
-                              controller: _idadeController,
-                              label: 'Idade',
-                              icon: Icons.cake,
-                              type: TextInputType.number,
-                            ),
+                            child: _buildDatePicker(),
                           ),
                         ],
                       ),
@@ -336,33 +399,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onChanged: (v) => setState(() => _sexo = v),
                       ),
                       const SizedBox(height: 16),
-
-                      _buildDropdown<int>(
-                        value: _tipoPerfil,
-                        items: [1, 2, 3],
-                        displayMap: {
-                          1: 'Trilheiro',
-                          2: 'Guia',
-                          3: 'Operador de Base',
-                        },
-                        label: 'Tipo de Conta',
-                        icon: Icons.badge,
-                        onChanged: (v) => setState(() => _tipoPerfil = v ?? 1),
-                      ),
-
-                      if (_tipoPerfil > 1) ...[
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _adminCodeController,
-                          label: 'Código de Administrador*',
-                          icon: Icons.vpn_key,
-                          hint: 'MAPL_ADMIN_2025',
-
-                          validator: (v) => (v?.isEmpty ?? true)
-                              ? 'Código obrigatório para funcionários'
-                              : null,
-                        ),
-                      ],
 
                       const SizedBox(height: 30),
 
@@ -400,6 +436,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDatePicker() {
+    final label = _dataNascimento == null
+        ? 'Nascimento'
+        : '${_dataNascimento!.day.toString().padLeft(2, '0')}/'
+            '${_dataNascimento!.month.toString().padLeft(2, '0')}/'
+            '${_dataNascimento!.year}';
+
+    return GestureDetector(
+      onTap: _pickDate,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today, color: Colors.white70, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: _dataNascimento == null
+                      ? const Color.fromARGB(255, 255, 255, 255).withValues(alpha: 0.7)
+                      : Colors.white,
+                  fontSize: 14,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -67,6 +67,38 @@ class ApiService {
     return await _fetchWithCache('/api/clima?lat=$lat&lon=$lon', 'clima_local');
   }
 
+  Future<Map<String, dynamic>> buscarUsuarioPorCpf(String cpf) async {
+    final cpfLimpo = cpf.replaceAll(RegExp(r'\D'), '');
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/api/usuario/buscar-cpf/$cpfLimpo'))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 404) throw Exception('Usuário não encontrado para o CPF informado.');
+      if (response.statusCode != 200) throw Exception('Erro do servidor (${response.statusCode}).');
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw Exception('Resposta inválida do servidor. Verifique se o servidor está atualizado e reiniciado.');
+    }
+  }
+
+  Future<void> atualizarPerfilUsuario(int userId, int tipoPerfil) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/api/usuario/$userId/perfil'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'tipo_perfil': tipoPerfil}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(data['erro'] ?? 'Erro ao atualizar perfil');
+      }
+    } on FormatException {
+      throw Exception('Resposta inválida do servidor. Verifique se o servidor está atualizado e reiniciado.');
+    }
+  }
+
   Future<List<dynamic>> getUsuarios({int? tipoPerfil}) async {
     String endpoint = '/api/usuarios';
     String key = 'lista_todos_usuarios';

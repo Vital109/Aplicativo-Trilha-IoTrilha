@@ -2,6 +2,7 @@
 // ignore_for_file: unused_field
 
 import 'package:aplicativo_trilha/main.dart';
+import 'package:aplicativo_trilha/screens/assign_role_screen.dart';
 import 'package:aplicativo_trilha/screens/profile_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -98,6 +99,22 @@ class _OperatorDrawerState extends State<OperatorDrawer> {
                   leading: const Icon(Icons.dashboard),
                   title: const Text("Dashboard"),
                   onTap: () => Navigator.pop(context),
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.manage_accounts,
+                    color: Color(0xFF6A1B9A),
+                  ),
+                  title: const Text("Atribuir Função a Usuário"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AssignRoleScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

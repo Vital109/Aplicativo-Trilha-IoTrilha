@@ -1,4 +1,5 @@
 // lib/screens/operator_screen.dart
+import 'package:aplicativo_trilha/screens/assign_role_screen.dart';
 import 'package:aplicativo_trilha/screens/schedule_management_screen.dart';
 import 'package:aplicativo_trilha/screens/tag_manager_screen.dart';
 import 'package:aplicativo_trilha/widgets/operator_drawer.dart';
@@ -106,6 +107,8 @@ class _OperatorScreenState extends State<OperatorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildActionCard(),
+                    const SizedBox(height: 12),
+                    _buildAssignRoleCard(),
 
                     const SizedBox(height: 24),
                     Text(
@@ -495,6 +498,62 @@ class _OperatorScreenState extends State<OperatorScreen> {
                     const SizedBox(height: 4),
                     Text(
                       "Provisionar e diagnosticar hardware.",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssignRoleCard() {
+    return Card(
+      elevation: 4,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AssignRoleScreen()),
+        ),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6A1B9A).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.manage_accounts,
+                  color: Color(0xFF6A1B9A),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Atribuir Função a Usuário",
+                      style: TextStyle(
+                        color: Colors.grey[900],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Promover trilheiro a guia ou operador de base.",
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ],

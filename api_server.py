@@ -138,7 +138,7 @@ def get_eventos_por_tag(tag_id):
     conexao = conectar_mysql()
     if conexao is None:
         return jsonify({"erro": "Nao foi possivel conectar ao banco"}), 500
-
+    
     try:
         with conexao.cursor() as cursor:
             sql = """
@@ -827,10 +827,10 @@ def atualizar_dados_usuario(user_id):
     except pymysql.Error as err:
         return jsonify({"erro": f"Erro SQL: {err}"}), 500
     finally:
-        if conexao: conexao.close()
+        if conexao:
+            conexao.close()
 
-        
-        Recuperar Senha (Esqueci minha senha) ---
+# --- Recuperar Senha (Esqueci minha senha) ---
 @app.route('/api/recuperar-senha', methods=['POST'])
 def recuperar_senha():
     print("[API_SERVER] Recebida solicitação de recuperação de senha")
@@ -842,7 +842,8 @@ def recuperar_senha():
         return jsonify({"erro": "E-mail e nova senha são obrigatórios"}), 400
 
     conexao = conectar_mysql()
-    if conexao is None: return jsonify({"erro": "Sem conexão com BD"}), 500
+    if conexao is None:
+        return jsonify({"erro": "Sem conexão com BD"}), 500
 
     try:
         with conexao.cursor() as cursor:
@@ -853,15 +854,19 @@ def recuperar_senha():
                 return jsonify({"erro": "E-mail não encontrado"}), 404
 
             nova_hash = generate_password_hash(nova_senha)
-            cursor.execute("UPDATE usuarios SET senha_hash = %s WHERE id = %s", (nova_hash, usuario['id']))
+            cursor.execute(
+                "UPDATE usuarios SET senha_hash = %s WHERE id = %s",
+                (nova_hash, usuario['id'])
+            )
             conexao.commit()
 
-            return jsonify({"mensagem": "Senha redefinida com sucesso!"})
+        return jsonify({"mensagem": "Senha redefinida com sucesso!"})
 
     except pymysql.Error as err:
         return jsonify({"erro": f"Erro de SQL: {err}"}), 500
     finally:
-        if conexao: conexao.close()
+        if conexao:
+            conexao.close()
         
        # --- ENDPOINT 22: Listar Agendamentos Pendentes (CORRIGIDO) ---
 @app.route('/api/agendamentos/pendentes', methods=['GET'])
@@ -950,6 +955,58 @@ def atualizar_status_agendamento(agendamento_id):
             conexao.commit()
             
             return jsonify({"mensagem": f"Status atualizado para {novo_status}"})
+    except pymysql.Error as err:
+        return jsonify({"erro": str(err)}), 500
+    finally:
+        if conexao: conexao.close()
+
+# --- ENDPOINT 25: Buscar Usuário por CPF ---
+@app.route('/api/usuario/buscar-cpf/<string:cpf>', methods=['GET'])
+def buscar_usuario_por_cpf(cpf):
+    cpf_limpo = ''.join(filter(str.isdigit, cpf))
+    if len(cpf_limpo) != 11:
+        return jsonify({"erro": "CPF inválido"}), 400
+
+    conexao = conectar_mysql()
+    if conexao is None: return jsonify({"erro": "Sem conexão"}), 500
+
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, nome, email, tipo_perfil, telefone, url_foto_perfil FROM usuarios WHERE cpf = %s",
+                (cpf_limpo,)
+            )
+            usuario = cursor.fetchone()
+            if not usuario:
+                return jsonify({"erro": "Usuário não encontrado"}), 404
+            return jsonify(usuario)
+    except pymysql.Error as err:
+        return jsonify({"erro": str(err)}), 500
+    finally:
+        if conexao: conexao.close()
+
+# --- ENDPOINT 26: Atualizar Tipo de Perfil do Usuário ---
+@app.route('/api/usuario/<int:user_id>/perfil', methods=['PUT'])
+def atualizar_perfil_usuario(user_id):
+    data = request.json
+    novo_tipo = data.get('tipo_perfil')
+
+    if novo_tipo not in [1, 2, 3]:
+        return jsonify({"erro": "tipo_perfil inválido. Use 1 (Trilheiro), 2 (Guia) ou 3 (Operador)"}), 400
+
+    conexao = conectar_mysql()
+    if conexao is None: return jsonify({"erro": "Sem conexão"}), 500
+
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute(
+                "UPDATE usuarios SET tipo_perfil = %s WHERE id = %s",
+                (novo_tipo, user_id)
+            )
+            conexao.commit()
+            if cursor.rowcount == 0:
+                return jsonify({"erro": "Usuário não encontrado"}), 404
+            return jsonify({"mensagem": "Perfil atualizado com sucesso!"})
     except pymysql.Error as err:
         return jsonify({"erro": str(err)}), 500
     finally:
