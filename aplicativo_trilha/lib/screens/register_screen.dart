@@ -58,17 +58,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return true;
   }
 
-  int? _calcularIdade(DateTime? data) {
-    if (data == null) return null;
-    final hoje = DateTime.now();
-    int idade = hoje.year - data.year;
-    if (hoje.month < data.month ||
-        (hoje.month == data.month && hoje.day < data.day)) {
-      idade--;
-    }
-    return idade;
-  }
-
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -177,7 +166,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       senha: _senhaController.text,
       tipoPerfil: _tipoPerfil,
       telefone: _telefoneController.text,
-      idade: _calcularIdade(_dataNascimento),
+      dataNascimento: _dataNascimento != null
+          ? '${_dataNascimento!.year}-${_dataNascimento!.month.toString().padLeft(2, '0')}-${_dataNascimento!.day.toString().padLeft(2, '0')}'
+          : null,
       sexo: _sexo,
       adminCode: '',
       fotoPerfil: _imageFile,

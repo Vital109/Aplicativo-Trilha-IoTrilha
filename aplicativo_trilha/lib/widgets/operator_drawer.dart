@@ -3,6 +3,8 @@
 
 import 'package:aplicativo_trilha/main.dart';
 import 'package:aplicativo_trilha/screens/assign_role_screen.dart';
+import 'package:aplicativo_trilha/screens/guide_screen.dart';
+import 'package:aplicativo_trilha/screens/live_trail_screen.dart';
 import 'package:aplicativo_trilha/screens/profile_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +20,7 @@ class _OperatorDrawerState extends State<OperatorDrawer> {
   bool _isLoading = true;
 
   int? _userId;
+  int _userTipoInt = 3;
   String _userName = "Carregando...";
   String _userEmail = "";
   String? _userPhotoUrl;
@@ -35,6 +38,7 @@ class _OperatorDrawerState extends State<OperatorDrawer> {
       if (mounted) {
         setState(() {
           _userId = sessionData['id_usuario'] as int?;
+          _userTipoInt = int.tryParse(sessionData['user_tipo_perfil'] ?? '3') ?? 3;
           _userName = sessionData['user_nome'] ?? "Operador";
           _userEmail = sessionData['user_email'] ?? "";
           _userPhotoUrl = sessionData['user_foto_url'];
@@ -96,8 +100,31 @@ class _OperatorDrawerState extends State<OperatorDrawer> {
               padding: EdgeInsets.zero,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.dashboard),
-                  title: const Text("Dashboard"),
+                  leading: const Icon(Icons.hiking, color: Color(0xFF2E7D32)),
+                  title: const Text("Painel do Trilheiro"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LiveTrailScreen()),
+                    );
+                  },
+                ),
+                if (_userTipoInt >= 2)
+                  ListTile(
+                    leading: const Icon(Icons.map, color: Colors.deepOrange),
+                    title: const Text("Painel do Guia"),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const GuideScreen()),
+                      );
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.dashboard, color: Colors.blue),
+                  title: const Text("Painel do Operador"),
                   onTap: () => Navigator.pop(context),
                 ),
                 ListTile(

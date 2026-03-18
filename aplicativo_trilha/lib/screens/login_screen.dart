@@ -30,13 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = false);
     if (response == "OK") {
-      final userData = await authService.getUserData();
-      final tipoPerfil = int.parse(userData['user_tipo_perfil'] ?? '1');
-
-      UserProfile profile = UserProfile.trilheiro;
-      if (tipoPerfil == 2) profile = UserProfile.guia;
-      if (tipoPerfil == 3) profile = UserProfile.operador;
       if (mounted) {
+        const UserProfile profile = UserProfile.trilheiro;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => MainShell(profile: profile)),
