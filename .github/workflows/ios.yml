@@ -1,0 +1,37 @@
+name: Build Flutter iOS
+
+on:
+  push:
+    branches:
+      - main   # executa quando você enviar código para a branch "main"
+
+jobs:
+  build-ios:
+    runs-on: macos-latest   # usa um Mac virtual do GitHub
+
+    steps:
+      # 1. Baixa seu código
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # 2. Instala o Flutter
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'  # coloque a versão que você usa
+          channel: 'stable'
+
+      # 3. Baixa as dependências do projeto
+      - name: Instalar dependências
+        run: flutter pub get
+
+      # 4. Compila para iOS (sem assinatura)
+      - name: Compilar iOS
+        run: flutter build ios --release --no-codesign
+
+      # 5. Salva o resultado para você baixar
+      - name: Salvar arquivo compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-ios
+          path: build/ios/iphoneos/Runner.app
