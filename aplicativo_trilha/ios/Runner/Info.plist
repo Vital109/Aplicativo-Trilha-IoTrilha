@@ -1,29 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<key>NSPhotoLibraryUsageDescription</key>
-    <string>Precisamos de acesso à sua galeria para que você possa escolher uma foto de perfil.</string>
-
-    <key>NSCameraUsageDescription</key>
-    <string>Precisamos da câmera para escanear os QR Codes das tags e para sua foto de perfil.</string>
-<key>NSAppTransportSecurity</key>
 <dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Precisamos de acesso à sua galeria para que você possa escolher uma foto de perfil.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Precisamos da câmera para escanear os QR Codes das tags e para sua foto de perfil.</string>
 	<key>NFCReaderUsageDescription</key>
-    <string>Precisamos ler as tags NFC da trilha para registrar seu progresso.</string>
-
-    <key>NSCameraUsageDescription</key>
-    <string>Precisamos da câmera para escanear os QR Codes das tags da trilha.</string>
-
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Precisamos da sua localização para mostrar sua posição no mapa da trilha.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Usamos sua localização para monitorar o progresso mesmo com o app em segundo plano.</string>
-
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsLocalNetworking</key>
-        <true/>
-    </dict>
+	<string>Precisamos ler as tags NFC da trilha para registrar seu progresso.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Precisamos da sua localização para mostrar sua posição no mapa da trilha.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Usamos sua localização para monitorar o progresso mesmo com o app em segundo plano.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -67,7 +60,5 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NFCReaderUsageDescription</key>
-	<string>For Testing</string>
 </dict>
 </plist>
