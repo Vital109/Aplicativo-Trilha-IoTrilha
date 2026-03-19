@@ -162,7 +162,7 @@ class AuthService {
     required String senha,
     required int tipoPerfil,
     String? telefone,
-    int? idade,
+    String? dataNascimento,
     String? sexo,
     String? adminCode,
     XFile? fotoPerfil,
@@ -177,7 +177,7 @@ class AuthService {
       request.fields['senha'] = senha;
       request.fields['tipo_perfil'] = tipoPerfil.toString();
       if (telefone != null) request.fields['telefone'] = telefone;
-      if (idade != null) request.fields['idade'] = idade.toString();
+      if (dataNascimento != null) request.fields['data_nascimento'] = dataNascimento;
       if (sexo != null) request.fields['sexo'] = sexo;
       if (adminCode != null) request.fields['admin_code'] = adminCode;
       if (fotoPerfil != null) {

@@ -1,0 +1,199 @@
+============================================================
+  RELATÓRIO — APLICATIVO TRILHA IoTrilha
+  Branch: vital/v1.7-promocao-perfil
+============================================================
+
+------------------------------------------------------------
+1. O QUE FOI FEITO NESTA SESSÃO
+------------------------------------------------------------
+
+1.1 TELA DE ATRIBUIÇÃO DE TAG AO TRILHEIRO
+    Arquivo criado: aplicativo_trilha/lib/screens/assign_tag_screen.dart
+
+    Fluxo da tela:
+      - Operador digita o ID lógico da tag física
+      - Busca o trilheiro por CPF (reusa o endpoint existente)
+      - Valida que o usuário encontrado é do tipo trilheiro (perfil 1)
+      - Exibe card de confirmação com nome do trilheiro e ID da tag
+      - Confirma o vínculo chamando PUT /api/tags/{tagId}/atribuir
+
+1.2 NOVO MÉTODO NA API SERVICE
+    Arquivo: aplicativo_trilha/lib/services/api_service.dart
+
+    Adicionado: atribuirTagAoTrilheiro(int tagId, int userId)
+    Chama: PUT /api/tags/{tagId}/atribuir
+    Body: { "usuario_id": userId }
+
+1.3 NOVO CARD NO PAINEL DO OPERADOR
+    Arquivo: aplicativo_trilha/lib/screens/operator_screen.dart
+
+    Card "Atribuir Tag a Trilheiro" adicionado entre o gerenciador
+    de tags NFC e o de funções. Navega para AssignTagScreen.
+
+1.4 CORREÇÃO DE NAVEGAÇÃO NOS DRAWERS
+    Arquivos:
+      - aplicativo_trilha/lib/widgets/operator_drawer.dart
+      - aplicativo_trilha/lib/widgets/guide_drawer.dart
+
+    Problema: "Painel do Trilheiro" usava Navigator.popUntil(isFirst),
+    que voltava para a primeira rota da pilha — que para operador e
+    guia é a própria tela deles, não o painel do trilheiro.
+
+    Correção: Substituído por Navigator.push para LiveTrailScreen,
+    igual ao padrão já usado pelos outros itens do drawer.
+
+
+------------------------------------------------------------
+2. ARQUITETURA DO SISTEMA (RESUMO TÉCNICO)
+------------------------------------------------------------
+
+O projeto é um sistema de rastreamento offline-first para
+segurança em trilhas. Funciona com dois elementos de hardware:
+
+  [A] TAGS RFID FIXAS NOS CHECKPOINTS
+      - Instaladas fisicamente ao longo do percurso
+      - Cada tag tem coordenadas geográficas fixas cadastradas
+      - O trilheiro usa o NFC do celular para lê-las ao passar
+      - O app registra: id_tag + GPS do celular + horário
+      - Envia via MQTT para o servidor (com buffer offline local)
+      - Grava de volta na tag: quem passou + quando (memória física)
+
+  [B] TAG PESSOAL DO TRILHEIRO
+      - Tag RFID atribuída pelo operador antes da trilha
+      - Trilheiro carrega consigo durante o percurso
+      - Pode ser lida por guias ou dispositivos externos
+      - Permite identificar o trilheiro sem acesso à internet
+      - Vínculo: operador associa ID lógico da tag à conta do trilheiro
+
+Fluxo completo:
+  Operador formata tag → atribui ao trilheiro João (tag ID 42)
+  João inicia trilha com a tag no bolso
+  Ao chegar num checkpoint fixo:
+    → celular de João lê a tag do checkpoint
+    → registra passagem localmente (buffer)
+    → envia evento via MQTT ao servidor
+    → grava na tag: "João passou aqui às 10:32"
+  Guia ou resgate pode ler o checkpoint depois
+    → sabe quem passou e quando, mesmo sem internet
+
+
+------------------------------------------------------------
+3. O QUE PRECISA SER ADICIONADO NO api_server.py
+------------------------------------------------------------
+
+3.1 ENDPOINT 27 — Atribuir Tag a Trilheiro  [OBRIGATÓRIO]
+    Rota: PUT /api/tags/<tag_id>/atribuir
+    Body: { "usuario_id": 42 }
+
+    Código a adicionar no api_server.py:
+
+    # --- ENDPOINT 27: Atribuir Tag a Trilheiro ---
+    @app.route('/api/tags/<int:tag_id>/atribuir', methods=['PUT'])
+    def atribuir_tag_ao_trilheiro(tag_id):
+        data = request.json
+        usuario_id = data.get('usuario_id')
+
+        if not usuario_id:
+            return jsonify({"erro": "usuario_id é obrigatório"}), 400
+
+        conexao = conectar_mysql()
+        if conexao is None: return jsonify({"erro": "Sem conexão"}), 500
+
+        try:
+            with conexao.cursor() as cursor:
+                # Verifica se a tag existe
+                cursor.execute(
+                    "SELECT id FROM tags_fisicas WHERE id = %s", (tag_id,)
+                )
+                if not cursor.fetchone():
+                    return jsonify({"erro": "Tag não encontrada"}), 404
+
+                # Verifica se o usuário existe e é trilheiro (tipo_perfil = 1)
+                cursor.execute(
+                    "SELECT id, tipo_perfil FROM usuarios WHERE id = %s",
+                    (usuario_id,)
+                )
+                usuario = cursor.fetchone()
+                if not usuario:
+                    return jsonify({"erro": "Usuário não encontrado"}), 404
+                if usuario['tipo_perfil'] != 1:
+                    return jsonify({"erro": "Usuário não é um trilheiro"}), 400
+
+                # Atribui a tag ao usuário
+                cursor.execute(
+                    "UPDATE tags_fisicas SET usuario_id = %s WHERE id = %s",
+                    (usuario_id, tag_id)
+                )
+                conexao.commit()
+
+                return jsonify({
+                    "mensagem": f"Tag {tag_id} atribuída ao usuário {usuario_id} com sucesso!"
+                })
+
+        except pymysql.Error as err:
+            return jsonify({"erro": str(err)}), 500
+        finally:
+            if conexao: conexao.close()
+
+
+3.2 MIGRAÇÃO DO BANCO DE DADOS  [OBRIGATÓRIO]
+    A tabela tags_fisicas precisa da coluna usuario_id.
+    Executar no MySQL:
+
+    ALTER TABLE tags_fisicas
+        ADD COLUMN usuario_id INT NULL,
+        ADD FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE SET NULL;
+
+
+3.3 MELHORIA NO ENDPOINT 12 — Listar Tags  [RECOMENDADO]
+    Rota existente: GET /api/tags
+
+    Substituir a query atual por:
+
+    SELECT t.id, t.uid_hardware, t.criado_em,
+           t.usuario_id, u.nome as nome_trilheiro
+    FROM tags_fisicas t
+    LEFT JOIN usuarios u ON t.usuario_id = u.id
+    ORDER BY t.id DESC
+
+    Isso faz a lista de tags no gerenciador mostrar
+    a qual trilheiro cada tag está atribuída.
+
+
+------------------------------------------------------------
+4. ENDPOINTS EXISTENTES NO api_server.py (REFERÊNCIA)
+------------------------------------------------------------
+
+  EP01  GET  /api/dashboard/geral
+  EP02  GET  /api/eventos/tag/<tag_id>
+  EP03  POST /api/register
+  EP04  POST /api/login
+  EP05  GET  /uploads/<filename>             (arquivos estáticos)
+  EP06  POST /api/trilha/iniciar
+  EP07  GET  /api/trilha/detalhes/<trilha_id>
+  EP08  POST /api/trilha/finalizar/<trilha_id>
+  EP09  GET  /api/clima
+  EP10  GET  /api/trilhas/usuario/<user_id>/historico
+  EP11  POST /api/tags/provisionar
+  EP12  GET  /api/tags
+  EP13  DEL  /api/tags/<tag_id>
+  EP14  DEL  /api/usuario/<user_id>
+  EP15  GET  /api/guia/<guia_id>/agendamentos
+  EP16  PUT  /api/guia/<guia_id>/status
+  EP17  PUT  /api/usuario/<user_id>/foto
+  EP18  GET  /api/dashboard/detalhado
+  EP19  GET  /api/usuarios
+  EP20  GET  /api/usuario/<user_id>
+  EP21  PUT  /api/usuario/<user_id>/dados
+  EP22  POST /api/recuperar-senha
+  EP23  GET  /api/agendamentos/pendentes
+  EP24  PUT  /api/agendamento/<id>/atribuir
+  EP25  PUT  /api/agendamento/<id>/status
+  EP26  GET  /api/usuario/buscar-cpf/<cpf>
+  EP27  PUT  /api/usuario/<user_id>/perfil
+  --  PUT  /api/tags/<tag_id>/atribuir      [FALTANDO — ver item 3.1]
+
+============================================================
+  Fim do Relatório
+============================================================

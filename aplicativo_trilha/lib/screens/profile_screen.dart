@@ -3,7 +3,9 @@
 
 import 'dart:io';
 import 'package:aplicativo_trilha/main.dart';
+import 'package:aplicativo_trilha/screens/guide_screen.dart';
 import 'package:aplicativo_trilha/screens/login_screen.dart';
+import 'package:aplicativo_trilha/screens/operator_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -35,13 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoadingHistorico = false;
 
   // ESTADO DO GUIA
-  List<dynamic> _agendamentosGuia = [];
   bool _isGuiaOnline = false;
-  bool _isLoadingAgenda = false;
-
-  //ESTADO DO OPERADOR
-  Map<String, dynamic>? _dashboardData;
-  bool _isLoadingDash = false;
 
   //GERAL
   bool _isLoadingLocal = true;
@@ -55,23 +51,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Color get _themeColor {
-    if (_userTipoInt == 2) return Colors.deepOrange[800]!;
-    if (_userTipoInt == 3) return Colors.blue[900]!;
-    return const Color(0xFF2E7D32);
-  }
+  Color get _themeColor => const Color(0xFF2E7D32);
 
   Future<void> _loadAllData() async {
     await _loadUserData();
-
-    if (_userTipoInt == 1) {
-      await _loadLocalDataTrilheiro();
-      await _loadHistoricoTrilheiro();
-    } else if (_userTipoInt == 2) {
-      await _loadAgendaGuia();
-    } else if (_userTipoInt == 3) {
-      await _loadDashboardOperador();
-    }
+    await _loadLocalDataTrilheiro();
+    await _loadHistoricoTrilheiro();
   }
 
   Future<void> _loadUserData() async {
@@ -123,15 +108,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             fullData['tipo_perfil'] ?? localData['user_tipo_perfil'] ?? '1';
         _userTipoInt = int.tryParse(rawTipo.toString()) ?? 1;
 
-        if (_userTipoInt == 1)
-          _userTipo = "Trilheiro";
-        else if (_userTipoInt == 2) {
-          _userTipo = "Guia";
+        if (_userTipoInt == 2) {
+          _userTipo = "Trilheiro • Guia";
           _isGuiaOnline = localData['status_guia'] == 'disponivel';
-        } else if (_userTipoInt == 3)
-          _userTipo = "Operador";
-        else
-          _userTipo = "Desconhecido";
+        } else if (_userTipoInt == 3) {
+          _userTipo = "Trilheiro • Guia • Operador";
+        } else {
+          _userTipo = "Trilheiro";
+        }
       });
     }
   }
@@ -167,58 +151,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _loadAgendaGuia() async {
-    if (!mounted) return;
-    setState(() => _isLoadingAgenda = true);
-    try {
-      final userId = await authService.getLoggedInUserId();
-      if (userId != null) {
-        final lista = await apiService.getAgendamentosGuia(int.parse(userId));
-        if (mounted) setState(() => _agendamentosGuia = lista);
-      }
-    } catch (e) {
-      print("Erro agenda: $e");
-    } finally {
-      if (mounted) setState(() => _isLoadingAgenda = false);
-    }
-  }
-
-  Future<void> _loadDashboardOperador() async {
-    if (!mounted) return;
-    setState(() => _isLoadingDash = true);
-    try {
-      final dados = await apiService.getDashboardDetalhado();
-      if (mounted) setState(() => _dashboardData = dados);
-    } catch (e) {
-      print("Erro dash: $e");
-    } finally {
-      if (mounted) setState(() => _isLoadingDash = false);
-    }
-  }
-
-  // AÇÕES DO GUIA
-  Future<void> _toggleStatusGuia(bool valor) async {
-    setState(() => _isGuiaOnline = valor);
-    try {
-      final userId = await authService.getLoggedInUserId();
-      if (userId != null) {
-        String statusString = valor ? 'disponivel' : 'offline';
-        await apiService.updateStatusGuia(int.parse(userId), statusString);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(valor ? "Você está Online!" : "Você está Offline."),
-            backgroundColor: valor ? Colors.green : Colors.grey,
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _isGuiaOnline = !valor);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Erro ao mudar status")));
-    }
-  }
 
   //FUNÇÕES DE FOTO
 
@@ -738,14 +670,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBodyContent() {
-    if (_userTipoInt == 1) {
-      return _buildTrilheiroContent();
-    } else if (_userTipoInt == 2) {
-      return _buildGuiaContent();
-    } else if (_userTipoInt == 3) {
-      return _buildOperadorContent();
-    }
-    return const Center(child: Text("Perfil desconhecido"));
+    return Column(
+      children: [
+        _buildTrilheiroContent(),
+        if (_userTipoInt >= 2) ...[
+          const SizedBox(height: 24),
+          _buildFuncoesHabilitadas(),
+        ],
+      ],
+    );
   }
 
   //CONTEÚDO DO TRILHEIRO
@@ -876,194 +809,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  //CONTEÚDO DO GUIA
-  Widget _buildGuiaContent() {
+  // FUNÇÕES HABILITADAS (Guia / Operador)
+  Widget _buildFuncoesHabilitadas() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: SwitchListTile(
-            title: const Text(
-              "Disponibilidade",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            subtitle: Text(
-              _isGuiaOnline ? "Visível para trilheiros" : "Invisível na busca",
-            ),
-            value: _isGuiaOnline,
-            activeColor: Colors.green,
-            secondary: Icon(
-              Icons.podcasts,
-              color: _isGuiaOnline ? Colors.green : Colors.grey,
-              size: 30,
-            ),
-            onChanged: _toggleStatusGuia,
-          ),
-        ),
-        const SizedBox(height: 24),
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            "Minha Agenda",
+            "Funções Habilitadas",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
         const SizedBox(height: 10),
-        _isLoadingAgenda
-            ? const CircularProgressIndicator()
-            : _agendamentosGuia.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.all(20),
-                child: Text(
-                  "Nenhum agendamento.",
-                  style: TextStyle(color: Colors.grey),
+        if (_userTipoInt >= 2)
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(16),
+              leading: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrange[50],
+                  shape: BoxShape.circle,
                 ),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _agendamentosGuia.length,
-                itemBuilder: (context, index) {
-                  final item = _agendamentosGuia[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.calendar_month,
-                          color: Colors.deepOrange,
-                        ),
-                      ),
-                      title: Text(item['nome_trilha'] ?? "Trilha"),
-                      subtitle: Text(
-                        "Data: ${item['data_agendada']}\nTrilheiro: ${item['nome_trilheiro']}",
-                      ),
-                      trailing: Chip(
-                        label: Text(
-                          item['status'] ?? "-",
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                        backgroundColor: item['status'] == 'confirmado'
-                            ? Colors.green[100]
-                            : Colors.orange[100],
-                      ),
-                    ),
-                  );
-                },
+                child: const Icon(Icons.map, color: Colors.deepOrange, size: 28),
               ),
-      ],
-    );
-  }
-
-  //CONTEÚDO DO OPERADOR
-  Widget _buildOperadorContent() {
-    return Column(
-      children: [
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "Dashboard do Sistema",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-        const SizedBox(height: 15),
-        if (_isLoadingDash)
-          const CircularProgressIndicator()
-        else if (_dashboardData != null)
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      "Total Usuários",
-                      "${_dashboardData!['total_usuarios']}",
-                      Icons.people,
-                      Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatCard(
-                      "Trilheiros",
-                      "${_dashboardData!['qtd_trilheiros']}",
-                      Icons.hiking,
-                      Colors.green,
-                    ),
-                  ),
-                ],
+              title: const Text(
+                "Painel do Guia",
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      "Guias",
-                      "${_dashboardData!['qtd_operadores']}",
-                      Icons.map,
-                      Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatCard(
-                      "Agendamentos",
-                      "${_dashboardData!['total_agendamentos']}",
-                      Icons.calendar_today,
-                      Colors.purple,
-                    ),
-                  ),
-                ],
+              subtitle: const Text("Agenda, disponibilidade e trilhas guiadas"),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GuideScreen()),
               ),
-            ],
-          ),
-
-        const SizedBox(height: 30),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "Gestão Rápida",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFEDE7F6),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.nfc, color: Colors.deepPurple, size: 30),
             ),
-            title: const Text(
-              "Gerenciar Tags NFC",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: const Text("Provisionar ou remover tags"),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Funcionalidade de Tags aqui")),
-              );
-            },
           ),
-        ),
+        if (_userTipoInt >= 2) const SizedBox(height: 12),
+        if (_userTipoInt >= 3)
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(16),
+              leading: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.admin_panel_settings,
+                    color: Colors.blue, size: 28),
+              ),
+              title: const Text(
+                "Painel do Operador de Base",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text("Gestão de usuários, tags e sistema"),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OperatorScreen()),
+              ),
+            ),
+          ),
       ],
     );
   }

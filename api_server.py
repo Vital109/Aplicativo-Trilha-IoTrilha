@@ -181,7 +181,7 @@ def register_user():
     senha = data.get('senha')
     tipo_perfil = int(data.get('tipo_perfil', 1))
     telefone = data.get('telefone')
-    idade = data.get('idade')
+    data_nascimento = data.get('data_nascimento')
     sexo = data.get('sexo')
     admin_code = data.get('admin_code')
 
@@ -199,10 +199,10 @@ def register_user():
     try:
         with conexao.cursor() as cursor:
             sql_insert_user = """
-            INSERT INTO usuarios (nome, email, cpf, senha_hash, tipo_perfil, telefone, idade, sexo)
+            INSERT INTO usuarios (nome, email, cpf, senha_hash, tipo_perfil, telefone, data_nascimento, sexo)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(sql_insert_user, (nome, email, cpf, senha_hash, tipo_perfil, telefone, idade, sexo))
+            cursor.execute(sql_insert_user, (nome, email, cpf, senha_hash, tipo_perfil, telefone, data_nascimento, sexo))
             novo_id = cursor.lastrowid 
             url_foto_final = None # Padrão
             if 'foto_perfil' in request.files:
@@ -521,7 +521,13 @@ def listar_tags():
     if conexao is None: return jsonify({"erro": "Sem conexão"}), 500
     try:
         with conexao.cursor() as cursor:
-            cursor.execute("SELECT id, uid_hardware, criado_em FROM tags_fisicas ORDER BY id DESC")
+            cursor.execute("""
+                SELECT t.id, t.uid_hardware, t.criado_em,
+                       t.usuario_id, u.nome as nome_trilheiro
+                FROM tags_fisicas t
+                LEFT JOIN usuarios u ON t.usuario_id = u.id
+                ORDER BY t.id DESC
+            """)
             tags = cursor.fetchall()
             return jsonify(tags)
     except pymysql.Error as err:
@@ -732,7 +738,9 @@ def get_usuarios():
     try:
         with conexao.cursor() as cursor:
             sql = """
-            SELECT id, nome, email, tipo_perfil, telefone, idade, sexo, url_foto_perfil, status_guia 
+            SELECT id, nome, email, tipo_perfil, telefone,
+                   TIMESTAMPDIFF(YEAR, data_nascimento, CURDATE()) as idade,
+                   data_nascimento, sexo, url_foto_perfil, status_guia
             FROM usuarios
             """
             
@@ -760,7 +768,9 @@ def get_dados_usuario_completo(user_id):
     try:
         with conexao.cursor() as cursor:
             sql = """
-            SELECT id, nome, email, telefone, idade, sexo, url_foto_perfil, tipo_perfil, status_guia
+            SELECT id, nome, email, telefone,
+                   TIMESTAMPDIFF(YEAR, data_nascimento, CURDATE()) as idade,
+                   data_nascimento, sexo, url_foto_perfil, tipo_perfil, status_guia
             FROM usuarios WHERE id = %s
             """
             cursor.execute(sql, (user_id,))
@@ -1007,6 +1017,41 @@ def atualizar_perfil_usuario(user_id):
             if cursor.rowcount == 0:
                 return jsonify({"erro": "Usuário não encontrado"}), 404
             return jsonify({"mensagem": "Perfil atualizado com sucesso!"})
+    except pymysql.Error as err:
+        return jsonify({"erro": str(err)}), 500
+    finally:
+        if conexao: conexao.close()
+
+# --- ENDPOINT 27: Atribuir Tag a Trilheiro ---
+@app.route('/api/tags/<int:tag_id>/atribuir', methods=['PUT'])
+def atribuir_tag_ao_trilheiro(tag_id):
+    data = request.json
+    usuario_id = data.get('usuario_id')
+
+    if not usuario_id:
+        return jsonify({"erro": "usuario_id é obrigatório"}), 400
+
+    conexao = conectar_mysql()
+    if conexao is None: return jsonify({"erro": "Sem conexão"}), 500
+
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute("SELECT id FROM tags_fisicas WHERE id = %s", (tag_id,))
+            if not cursor.fetchone():
+                return jsonify({"erro": "Tag não encontrada"}), 404
+
+            cursor.execute("SELECT id, tipo_perfil FROM usuarios WHERE id = %s", (usuario_id,))
+            usuario = cursor.fetchone()
+            if not usuario:
+                return jsonify({"erro": "Usuário não encontrado"}), 404
+
+            cursor.execute(
+                "UPDATE tags_fisicas SET usuario_id = %s WHERE id = %s",
+                (usuario_id, tag_id)
+            )
+            conexao.commit()
+            return jsonify({"mensagem": f"Tag {tag_id} atribuída ao usuário {usuario_id} com sucesso!"})
+
     except pymysql.Error as err:
         return jsonify({"erro": str(err)}), 500
     finally:

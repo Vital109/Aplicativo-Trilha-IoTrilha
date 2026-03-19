@@ -315,6 +315,24 @@ class ApiService {
     }
   }
 
+  Future<void> atribuirTagAoTrilheiro(int tagId, int userId) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/api/tags/$tagId/atribuir'),
+            headers: {'Content-Type': 'application/json; charset=UTF-8'},
+            body: jsonEncode({'usuario_id': userId}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(data['erro'] ?? 'Falha ao atribuir tag');
+      }
+    } on FormatException {
+      throw Exception('Resposta inválida do servidor. Verifique se o servidor está atualizado e reiniciado.');
+    }
+  }
+
   Future<void> atualizarStatusAgendamento(
     int agendamentoId,
     String status,
